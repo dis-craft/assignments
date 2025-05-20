@@ -15,6 +15,10 @@
             <form id="name-form" onsubmit="return false;">
                 <div class="input-group">
                     <input type="text" id="user-name" placeholder="Enter your name" required>
+                    <select id="subject-select" required>
+                        <option value="" disabled selected>Select Subject</option>
+                        <option value="english">English</option>
+                    </select>
                     <button type="button" id="start-btn">Get Started</button>
                 </div>
             </form>
@@ -79,8 +83,8 @@
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
     <script src="main.js"></script>
 </body>

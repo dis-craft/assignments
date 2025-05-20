@@ -1,21 +1,55 @@
 // Firebase Configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyB2yIESuvnB_VDYMQgTXR6_vGLpeot2_iw",
-    authDomain: "assignment-generator-app.firebaseapp.com",
-    projectId: "assignment-generator-app",
-    storageBucket: "assignment-generator-app.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890abcdef"
-};
+    apiKey: "AIzaSyCQplDmgPyEYy9CGu99mpu--_7wB71WVXI",
+    authDomain: "srikar-m-projects.firebaseapp.com",
+    databaseURL: "https://srikar-m-projects-default-rtdb.firebaseio.com",
+    projectId: "srikar-m-projects",
+    storageBucket: "srikar-m-projects.firebasestorage.app",
+    messagingSenderId: "139896255553",
+    appId: "1:139896255553:web:f29b96807041ae606f02c0",
+    measurementId: "G-HVMYNCRH2T"
+  };
 
 // Initialize Firebase
 try {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
-    var db = firebase.firestore();
+    
+    // Initialize Firebase Analytics
+    if (firebase.analytics) {
+        var analytics = firebase.analytics();
+        console.log("Firebase Analytics initialized successfully");
+    }
+    
+    // Initialize Firebase Realtime Database (RTDB)
+    var rtdb = firebase.database();
+    console.log("Firebase RTDB initialized successfully");
+    
+    // Create a dummy Firestore object to avoid errors
+    var db = {
+        collection: () => ({
+            add: (data) => {
+                console.log("Firestore write prevented, using RTDB instead");
+                // Generate a unique ID that would have come from Firestore
+                const uniqueId = 'user_' + new Date().getTime();
+                // Log to RTDB instead
+                rtdb.ref('users/' + uniqueId).set({
+                    ...data,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                return Promise.resolve({ id: uniqueId });
+            },
+            doc: (id) => ({
+                update: (data) => {
+                    console.log("Firestore update prevented, using RTDB instead");
+                    return rtdb.ref('users/' + id).update(data);
+                }
+            })
+        })
+    };
 } catch (error) {
     console.error("Error initializing Firebase:", error);
-    // Create a dummy db object to prevent errors if Firebase fails
+    // Create dummy objects to prevent errors if Firebase fails
     var db = {
         collection: () => ({
             add: () => Promise.resolve({ id: 'dummy-id' }),
@@ -24,17 +58,19 @@ try {
             })
         })
     };
+    var rtdb = null;
 }
 
 // Gemini API Configuration
-const GEMINI_API_KEY = "AIzaSyB2yIESuvnB_VDYMQgTXR6_vGLpeot2_iw";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const GEMINI_API_KEY = "AIzaSyBUKaDyUPgWBBY9o1GqfIYZ8Bx9zadsGZE";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // DOM Elements
 const welcomeSection = document.getElementById('welcome-section');
 const mainSection = document.getElementById('main-section');
 const startBtn = document.getElementById('start-btn');
 const userNameInput = document.getElementById('user-name');
+const subjectSelect = document.getElementById('subject-select');
 const userNameDisplay = document.getElementById('user-name-display');
 const generateBtn = document.getElementById('generate-btn');
 const resultsSection = document.getElementById('results-section');
@@ -45,6 +81,7 @@ const toastContainer = document.getElementById('toast-container');
 console.log("Welcome Section:", welcomeSection);
 console.log("Main Section:", mainSection);
 console.log("Start Button:", startBtn);
+console.log("Subject Select:", subjectSelect);
 
 // Get the LinkedIn link and add click tracking
 const linkedinLink = document.querySelector('.footer a');
@@ -62,8 +99,10 @@ const assignment3Checkbox = document.getElementById('assignment3');
 
 // User Information
 let userName = '';
+let userSubject = '';
 let userInfo = {
     name: '',
+    subject: '',
     browser: navigator.userAgent,
     platform: navigator.platform,
     language: navigator.language,
@@ -101,19 +140,34 @@ async function handleStart() {
         return;
     }
     
+    if (!subjectSelect) {
+        console.error("Subject select element not found");
+        return;
+    }
+    
     const name = userNameInput.value.trim();
+    const subject = subjectSelect.value;
+    
     console.log("User entered name:", name);
+    console.log("User selected subject:", subject);
     
     if (!name) {
         showToast('Please enter your name', 'error');
         return;
     }
     
+    if (!subject) {
+        showToast('Please select a subject', 'error');
+        return;
+    }
+    
     userName = name;
+    userSubject = subject;
     userInfo.name = name;
+    userInfo.subject = subject;
     
     if (userNameDisplay) {
-        userNameDisplay.textContent = `Welcome, ${userName}!`;
+        userNameDisplay.textContent = `Welcome, ${userName}! (${userSubject})`;
     } else {
         console.warn("User name display element not found");
     }
@@ -210,7 +264,20 @@ async function handleGenerate() {
 }
 
 async function generateAssignment1() {
-    const prompt = `Write a unique story in exactly 275 words using all categories of Present tense (simple present, present continuous, present perfect, and present perfect continuous). The story should be creative, engaging, and clearly demonstrate each tense category. Make it plagiarism-proof by creating original content. Include at least one example of each tense category. Add the user's name ${userName} as a character. Each sentence should use a different present tense category where possible.`;
+    const prompt = `Write a unique story using all categories of Present tense (simple present, present continuous, present perfect, and present perfect continuous). 
+
+The story should be exactly 275 words, creative, engaging, and clearly demonstrate each tense category. Include at least one example of each tense category. Each sentence should use a different present tense category where possible.
+
+IMPORTANT: 
+1. Start with a very short title (3-4 words maximum).
+2. Format your response with the title on the first line, then a blank line, followed by the 275-word story.
+3. DO NOT use any specific names in the story.
+4. Make the title catchy and relevant to the story's theme.
+
+Example format:
+Title Here
+
+Story content begins...`;
     
     const response = await callGeminiAPI(prompt);
     
@@ -223,7 +290,20 @@ async function generateAssignment1() {
 }
 
 async function generateAssignment2() {
-    const prompt = `Write a unique, plagiarism-proof essay on the importance of communication skills in a digital age. The essay should be formal and professional in tone, exactly 275 words, with clear paragraphs and a logical structure. Include an introduction with a thesis statement, body paragraphs with supporting evidence and examples, and a conclusion. Mention current digital platforms and technologies where relevant. Address how communication skills affect professional success, relationships, and personal development. Make a subtle reference to the reader, ${userName}, in a way that personalizes the content. Ensure the content is original and academically sound.`;
+    const prompt = `Write a unique, plagiarism-proof essay on the importance of communication skills in a digital age. 
+
+The essay should be exactly 275 words, formal and professional in tone, with clear paragraphs and a logical structure. Include an introduction with a thesis statement, body paragraphs with supporting evidence and examples, and a conclusion. Mention current digital platforms and technologies where relevant. Address how communication skills affect professional success, relationships, and personal development.
+
+IMPORTANT:
+1. Start with a very short title (3-4 words maximum).
+2. Format your response with the title on the first line, then a blank line, followed by the 275-word essay.
+3. DO NOT include or reference any specific person's name in the essay.
+4. Make the title concise but descriptive of the essay's main theme.
+
+Example format:
+Digital Communication Matters
+
+Essay content begins...`;
     
     const response = await callGeminiAPI(prompt);
     
@@ -236,7 +316,20 @@ async function generateAssignment2() {
 }
 
 async function generateAssignment3() {
-    const prompt = `Write a concise, unique paragraph (exactly 150 words) on Artificial Intelligence. The paragraph should be informative, professional, and plagiarism-proof. Include a brief explanation of what AI is, its current applications, and potential future implications. Make the content accessible but academically sound. Include a subtle reference to the reader, ${userName}, where appropriate. Ensure the language is sophisticated and the content is original.`;
+    const prompt = `Write a concise, unique paragraph on Artificial Intelligence.
+
+The paragraph should be exactly 275 words, informative, professional, and plagiarism-proof. Include a brief explanation of what AI is, its current applications, and potential future implications. Make the content accessible but academically sound.
+
+IMPORTANT:
+1. Start with a very short title (3-4 words maximum).
+2. Format your response with the title on the first line, then a blank line, followed by the 275-word paragraph on AI.
+3. DO NOT include or reference any specific person's name in the content.
+4. Make the title concise but descriptive of the main theme.
+
+Example format:
+AI's Boundless Horizon
+
+Content begins...`;
     
     const response = await callGeminiAPI(prompt);
     
@@ -249,116 +342,193 @@ async function generateAssignment3() {
 }
 
 async function callGeminiAPI(prompt) {
-    // Construct the request URL with API key
-    const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+    // Maximum number of retry attempts
+    const maxRetries = 2;
+    let retries = 0;
+    let errorMessages = [];
     
-    try {
-        console.log("Sending request to Gemini API with prompt:", prompt.substring(0, 50) + "...");
+    // List of model endpoints to try if the first one fails
+    const modelEndpoints = [
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent",
+        "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent", 
+        "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    ];
+    
+    // Try each endpoint until one works or we run out of attempts
+    for (let i = 0; i < modelEndpoints.length && retries <= maxRetries; i++) {
+        const url = `${modelEndpoints[i]}?key=${GEMINI_API_KEY}`;
         
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        parts: [
-                            {
-                                text: prompt
-                            }
-                        ]
+        try {
+            console.log(`Sending request to Gemini API with prompt (attempt ${retries + 1}):`, prompt.substring(0, 50) + "...");
+            console.log(`Using API endpoint: ${modelEndpoints[i]}`);
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [
+                        {
+                            parts: [
+                                {
+                                    text: prompt
+                                }
+                            ]
+                        }
+                    ],
+                    generationConfig: {
+                        temperature: 0.9,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 1024,
                     }
-                ],
-                generationConfig: {
-                    temperature: 0.9,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 1024,
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("API Error Response:", errorText);
+                errorMessages.push(`[Attempt ${retries + 1}] ${errorText}`);
+                throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log("API Response:", data);
+            
+            // Handle different response formats
+            if (data.candidates && data.candidates.length > 0) {
+                if (data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                    return data.candidates[0].content.parts[0].text;
+                } else if (data.candidates[0].text) {
+                    return data.candidates[0].text;
                 }
-            })
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("API Error Response:", errorText);
-            throw new Error(`API request failed with status ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("API Response:", data);
-        
-        // Handle different response formats
-        if (data.candidates && data.candidates.length > 0) {
-            if (data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
-                return data.candidates[0].content.parts[0].text;
-            } else if (data.candidates[0].text) {
-                return data.candidates[0].text;
+            }
+            
+            // If we can't extract the text through the normal paths, try a more generic approach
+            if (data.candidates && data.candidates[0]) {
+                // Try to extract text from any property that might contain it
+                const candidate = data.candidates[0];
+                if (typeof candidate === 'object') {
+                    // Search for any property that might contain the generated text
+                    for (const key in candidate) {
+                        if (typeof candidate[key] === 'string' && candidate[key].length > 50) {
+                            console.log(`Found potential text in property ${key}`);
+                            return candidate[key];
+                        } else if (typeof candidate[key] === 'object' && candidate[key] !== null) {
+                            // Go one level deeper
+                            for (const subKey in candidate[key]) {
+                                if (typeof candidate[key][subKey] === 'string' && candidate[key][subKey].length > 50) {
+                                    console.log(`Found potential text in property ${key}.${subKey}`);
+                                    return candidate[key][subKey];
+                                }
+                            }
+                        }
+                    }
+                }
+                // If all else fails and we have a candidate, stringify it as a last resort
+                return JSON.stringify(candidate);
+            }
+            
+            if (data.error) {
+                throw new Error(`API error: ${data.error.message || JSON.stringify(data.error)}`);
+            }
+            
+            throw new Error('Could not extract text content from the API response');
+            
+        } catch (error) {
+            console.error(`Error calling Gemini API (attempt ${retries + 1}):`, error);
+            errorMessages.push(error.message);
+            
+            retries++;
+            if (retries <= maxRetries && i < modelEndpoints.length - 1) {
+                // Wait before retrying (exponential backoff)
+                const waitTime = Math.pow(2, retries - 1) * 1000;
+                console.log(`Retrying in ${waitTime}ms with next model...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
             }
         }
-        
-        // Fallback content if the response format is unexpected
-        if (data.error) {
-            throw new Error(`API error: ${data.error.message || JSON.stringify(data.error)}`);
-        }
-        
-        // Simulate successful response for testing
-        console.log("Using fallback response since API response format was unexpected");
-        return generateFallbackResponse(prompt);
-        
-    } catch (error) {
-        console.error('Error calling Gemini API:', error);
-        
-        // For testing/demo purposes, generate fallback content
-        console.log("Using fallback content due to error");
-        return generateFallbackResponse(prompt);
     }
+    
+    // If all attempts fail, generate a fallback response
+    console.log("All API attempts failed, using fallback content");
+    return generateFallbackContent(prompt);
 }
 
-// Fallback function to generate content when API fails
-function generateFallbackResponse(prompt) {
+// Generate fallback content
+function generateFallbackContent(prompt) {
+    // Use an array of options to create variety with short 3-4 word titles
+    const storyTitles = [
+        "Morning Light Awakens",
+        "City In Motion",
+        "Endless Now Unfolds",
+        "Moments In Time",
+        "Rhythms Of Life",
+        "Windows And Reflections"
+    ];
+    
+    const essayTitles = [
+        "Digital Connection Matters",
+        "Modern Communication Evolution",
+        "Virtual Dialogue Era",
+        "Words Beyond Distance",
+        "Interconnected Expression Today"
+    ];
+    
+    const aiTitles = [
+        "Intelligence Without Boundaries",
+        "Machines Learning Tomorrow",
+        "Algorithmic Future Emerging",
+        "Digital Minds Evolve",
+        "Computational Cognition Advances"
+    ];
+    
+    // Get random title
+    const getRandomTitle = (array) => {
+        return array[Math.floor(Math.random() * array.length)];
+    };
+    
     if (prompt.includes("Present tense")) {
-        return `The Morning Ritual (275 words)
+        const title = getRandomTitle(storyTitles);
+        
+        return `${title}
 
-${userName} stands at the kitchen counter, carefully measuring coffee grounds. Every morning follows this same pattern, yet each day brings something new. The aroma of fresh coffee fills the air as water heats in the kettle.
+The morning arrives with golden light filtering through half-drawn curtains. A journalist moves through a bustling city center, observing the world with attentive eyes. Every detail matters in this moment of discovery. The air feels different today. People are noticing it too - some pause to look up at the sky while others continue with their routines, unaware of the subtle shift. The observer has been watching these patterns for years, finding meaning in the rhythms most overlook.
 
-"I am trying a new brewing method today," ${userName} explains to their roommate who has just entered the kitchen. The roommate, who has been living here for three years, nods appreciatively.
+"I am experiencing something unusual," the journalist thinks, recording observations in a worn notebook. Nearby conversations drift through the air, creating a backdrop of humanity's everyday symphony. While contemplating the significance of these observations, an unexpected encounter disrupts the routine. Someone is approaching with purpose, someone who has been searching for the right person to share a discovery.
 
-${userName} has been experimenting with coffee techniques since college. While pouring the water in slow circles, they notice how the coffee grounds bloom. "I have never seen it react quite like this before," they observe.
+The journalist has never seen such evidence before, despite years of careful study. This changes everything about the understanding that has been developing gradually over time. Suddenly, the surroundings transform as realization dawns. The city reveals itself with entirely new perspective. What was once familiar now unveils hidden dimensions and connections previously invisible.
 
-The sun is streaming through the window now, illuminating dust particles that dance in the morning light. ${userName} watches them while waiting for the coffee to brew. "I have been waiting all week for a morning like this," they sigh contentedly.
-
-Outside, birds are singing their morning songs, and the neighborhood is gradually waking up. Some neighbors are walking their dogs, while others are heading to work.
-
-"I have been thinking about changing my morning routine," ${userName} tells their roommate, who is checking emails on their phone. "But I am finding that these quiet moments have become essential."
-
-The coffee is finally ready. ${userName} has made this brew hundreds of times, yet still appreciates the first sip as if it's new. "This tastes perfect," they smile. "I think I have finally mastered the technique."
-
-The roommate, who has been watching this ritual unfold, laughs. "You say that every morning, and yet tomorrow you will try something new again."
-
-${userName} nods. "That's the beauty of it. I am constantly learning, even with something as simple as coffee."`;
+The day continues unfolding, but nothing remains the same. The journalist moves forward with renewed purpose, carrying insights that illuminate both past and future. Sometimes transformation happens in an instant, even while the world around continues its familiar rhythm. What happens next remains unwritten, but the story is already taking shape with today's revelations. The present moment holds all possibilities, connecting what has come before with what is yet to emerge.`;
     } else if (prompt.includes("communication skills")) {
-        return `The Importance of Communication Skills in a Digital Age (275 words)
+        const title = getRandomTitle(essayTitles);
+        
+        return `${title}
 
-In today's hyper-connected world, effective communication skills have become more crucial than ever before. The digital revolution has transformed how we interact, creating both unprecedented opportunities and unique challenges in how we convey information and build relationships.
+In our hyper-connected digital landscape, effective communication transcends traditional boundaries and creates unprecedented opportunities for human connection. The technological revolution has fundamentally transformed how we exchange information, build relationships, and collaborate across geographical and cultural divides.
 
-Communication in the digital age extends far beyond traditional face-to-face interactions. It now encompasses email correspondence, video conferencing, social media engagement, and collaborative online platforms. For professionals like ${userName}, mastering these various channels is no longer optional but essential for career advancement and organizational success.
+Contemporary communication extends far beyond face-to-face interactions into a complex ecosystem of digital channels. Email correspondence demands clarity and conciseness, while video conferencing requires strong visual presence and digital etiquette. Social media engagement involves understanding platform-specific norms and audience expectations. Meanwhile, collaborative tools necessitate asynchronous communication skills previously underdeveloped in professional contexts.
 
-Strong digital communication skills directly impact professional effectiveness. Studies consistently show that employers rank communication abilities among their most valued attributes in potential employees. The capacity to convey complex ideas clearly, listen actively to digital feedback, and adapt communication styles to different platforms significantly influences career trajectory.
+Research consistently demonstrates that employers prioritize communication abilities as essential professional attributes. The capacity to articulate complex ideas clearly, listen actively during digital exchanges, and adapt messaging appropriately across diverse platforms directly correlates with career advancement opportunities. Organizations increasingly recognize that technical expertise without communication proficiency creates significant limitations for both individual and collective success.
 
-Beyond the workplace, digital communication shapes our personal relationships. Social media platforms and messaging applications have revolutionized how we maintain connections across distances. However, they also require developing new competencies such as conveying tone appropriately in text and understanding platform-specific etiquette.
+Beyond professional contexts, digital communication fundamentally reshapes personal relationships. While technology enables connections across vast distances, it simultaneously requires developing new emotional intelligence capacities: conveying authentic tone in text-based exchanges, recognizing subtle emotional cues without physical presence, and maintaining meaningful connections through fragmented digital interactions.
 
-Educational institutions increasingly recognize communication as a core competency rather than a supplementary skill. Digital literacy—encompassing the ability to consume information critically and produce content effectively—has become central to modern curricula.
-
-To thrive in this environment, individuals must develop several key capabilities: platform fluency across various digital channels, audience awareness to adapt communication styles appropriately, critical consumption of digital information, and maintaining authenticity despite the often impersonal nature of digital interaction.
-
-For ${userName} and others navigating this landscape, developing these communication competencies represents not just a professional advantage but a fundamental life skill essential for success in our increasingly digital world.`;
+Educational institutions now recognize communication as foundational rather than supplementary. Digital literacy—encompassing both critical consumption and effective creation of digital content—has become central to contemporary learning objectives at all educational levels. To navigate this complex communication landscape successfully, individuals must develop platform versatility, audience awareness, and authentic self-expression despite the often impersonal nature of digital interaction.`;
     } else if (prompt.includes("Artificial Intelligence")) {
-        return `Artificial Intelligence: Reshaping Our World (150 words)
+        const title = getRandomTitle(aiTitles);
+        
+        return `${title}
 
-Artificial Intelligence (AI) represents one of the most transformative technological developments of our era, fundamentally altering how we interact with machines and process information. At its core, AI encompasses computer systems designed to perform tasks that typically require human intelligence—including visual perception, speech recognition, decision-making, and language translation. Unlike conventional computing, which follows explicit programming instructions, modern AI systems employ sophisticated machine learning algorithms that enable them to improve their performance through experience. These systems analyze vast datasets to identify patterns and make predictions with remarkable accuracy. Today, as ${userName} might observe in daily interactions with technology, AI applications have become ubiquitous—from virtual assistants recognizing voice commands to recommendation systems personalizing content. Looking forward, researchers anticipate developments in artificial general intelligence that could match or exceed human capabilities across diverse domains, raising profound questions about the future of work, privacy, and decision-making authority.`;
+Artificial Intelligence represents one of humanity's most transformative technological developments, fundamentally altering how we interact with machines and process information. At its core, AI encompasses computational systems designed to perform tasks traditionally requiring human intelligence—including visual perception, speech recognition, decision-making, and natural language understanding. Unlike conventional programming approaches, modern AI systems employ sophisticated machine learning algorithms that enable continuous improvement through data analysis and pattern recognition without explicit programming. These systems process vast information repositories to identify correlations and generate predictions with increasingly remarkable accuracy.
+
+In contemporary society, AI applications have become ubiquitous—from voice assistants organizing schedules and recommending content to diagnostic tools enhancing medical decisions and autonomous systems revolutionizing transportation. Machine learning algorithms now power recommendation systems that curate social media feeds, streaming content, and shopping suggestions. Computer vision technologies enable advanced security systems, autonomous vehicles, and medical imaging analysis. Natural language processing facilitates automated customer service, real-time translation, and text analysis across countless industries.
+
+Looking toward the horizon, researchers anticipate developments in artificial general intelligence that could potentially match or exceed human capabilities across diverse cognitive domains. This progression raises profound questions about the future nature of work, privacy boundaries, ethical frameworks for autonomous decision-making, and ultimately what constitutes uniquely human contribution in an increasingly automated world. Understanding AI's capabilities, limitations, and societal implications becomes essential for meaningful participation in shaping its responsible development and ensuring it advances human welfare while mitigating potential risks.`;
     } else {
-        return "I couldn't generate content for this prompt, but here's a sample response that would typically be provided.";
+        return `No specific content could be generated for this prompt. Please try a different prompt or try again later when our AI service is available.`;
     }
 }
 
@@ -366,12 +536,41 @@ function displayResult(result) {
     const resultCard = document.createElement('div');
     resultCard.className = 'result-card';
     
-    const resultContent = document.createElement('div');
-    resultContent.className = 'result-card-content';
-    resultContent.textContent = result.content;
+    // Extract title if present in content
+    let content = result.content;
+    let extractedTitle = '';
+    
+    // Check if content has a title at the beginning (either on its own line or with markdown formatting)
+    const titleMatch = content.match(/^(?:\*\*)?([^\n]+?)(?:\*\*)?(?:\n+|$)/);
+    if (titleMatch) {
+        extractedTitle = titleMatch[1].trim();
+        // Remove the title from the content
+        content = content.replace(titleMatch[0], '').trim();
+    }
     
     const resultTitle = document.createElement('h3');
     resultTitle.innerHTML = `<i class="fas ${result.icon}"></i> ${result.title}`;
+    
+    // Create separate title paragraph if extracted
+    const titleParagraph = document.createElement('p');
+    titleParagraph.className = 'result-title';
+    titleParagraph.textContent = extractedTitle || '';
+    
+    // Process content for markdown formatting
+    content = processMarkdown(content);
+    
+    // Count words in the content (excluding the title)
+    const strippedContent = stripMarkdown(result.content.replace(titleMatch ? titleMatch[0] : '', '').trim());
+    const wordCount = strippedContent.split(/\s+/).length;
+    
+    const resultContent = document.createElement('div');
+    resultContent.className = 'result-card-content';
+    resultContent.innerHTML = content; // Using innerHTML since we've processed the markdown
+    
+    // Create word count element
+    const wordCountElement = document.createElement('div');
+    wordCountElement.className = 'word-count';
+    wordCountElement.textContent = `Word count: ${wordCount}`;
     
     const actionButtons = document.createElement('div');
     actionButtons.className = 'action-buttons';
@@ -380,7 +579,9 @@ function displayResult(result) {
     copyButton.className = 'copy-btn';
     copyButton.innerHTML = '<i class="fas fa-copy"></i> Copy';
     copyButton.addEventListener('click', () => {
-        navigator.clipboard.writeText(result.content)
+        // When copying, include both title and content, but as plain text
+        const fullText = (extractedTitle ? extractedTitle + '\n\n' : '') + stripMarkdown(result.content);
+        navigator.clipboard.writeText(fullText)
             .then(() => {
                 showToast('Content copied to clipboard!', 'success');
             })
@@ -393,10 +594,44 @@ function displayResult(result) {
     actionButtons.appendChild(copyButton);
     
     resultCard.appendChild(resultTitle);
+    if (extractedTitle) {
+        resultCard.appendChild(titleParagraph);
+    }
     resultCard.appendChild(resultContent);
+    resultCard.appendChild(wordCountElement); // Add word count element before action buttons
     resultCard.appendChild(actionButtons);
     
     resultsSection.appendChild(resultCard);
+}
+
+// Function to process markdown-like formatting
+function processMarkdown(text) {
+    // Handle bold text (** or __)
+    text = text.replace(/\*\*(.*?)\*\*|__(.*?)__/g, '<strong>$1$2</strong>');
+    
+    // Handle italic text (* or _)
+    text = text.replace(/\*(.*?)\*|_(.*?)_/g, '<em>$1$2</em>');
+    
+    // Handle line breaks
+    text = text.replace(/\n/g, '<br>');
+    
+    // Handle paragraphs (double line breaks)
+    text = text.replace(/<br><br>/g, '</p><p>');
+    
+    // Wrap the text in paragraph tags
+    text = '<p>' + text + '</p>';
+    
+    // Fix any empty paragraphs
+    text = text.replace(/<p><\/p>/g, '');
+    
+    return text;
+}
+
+// Function to strip markdown for clipboard copying
+function stripMarkdown(text) {
+    return text
+        .replace(/\*\*(.*?)\*\*|__(.*?)__/g, '$1$2')
+        .replace(/\*(.*?)\*|_(.*?)_/g, '$1$2');
 }
 
 function showToast(message, type = 'success') {
@@ -448,25 +683,52 @@ function showToast(message, type = 'success') {
 }
 
 async function logUserVisit() {
-    console.log("logUserVisit function called with userInfo:", JSON.stringify(userInfo, null, 2));
+    console.log("logUserVisit function called");
+    
+    try {
+        // Get IP address info
+        const ipInfo = await fetchIPInfo();
+        if (ipInfo) {
+            userInfo.ipAddress = ipInfo.ip;
+            userInfo.ipLocation = {
+                country: ipInfo.country_name || '',
+                city: ipInfo.city || '',
+                region: ipInfo.region || ''
+            };
+            console.log("IP information collected");
+        }
+    } catch (error) {
+        console.error("Error fetching IP info:", error);
+    }
+    
+    console.log("Logging user visit to Firebase RTDB");
     
     // Return a Promise that resolves when the user is logged
     return new Promise((resolve, reject) => {
         try {
-            db.collection('users').add(userInfo)
-                .then((docRef) => {
-                    console.log('User logged with ID:', docRef.id);
-                    userInfo.userId = docRef.id; // Set userId from the Firebase document
-                    resolve(docRef.id);
+            // Generate a unique ID
+            const uniqueId = 'user_' + new Date().getTime();
+            userInfo.userId = uniqueId;
+            
+            // Log directly to Realtime Database
+            if (rtdb) {
+                const rtdbRef = rtdb.ref('visits/' + uniqueId);
+                rtdbRef.set({
+                    ...userInfo,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                })
+                .then(() => {
+                    console.log('User logged to RTDB successfully with ID:', uniqueId);
+                    resolve(uniqueId);
                 })
                 .catch((error) => {
-                    console.error('Error logging user to Firebase:', error);
-                    // Generate a fallback ID to avoid later errors
-                    const fallbackId = 'fallback-' + new Date().getTime();
-                    console.log('Using fallback ID:', fallbackId);
-                    userInfo.userId = fallbackId;
-                    resolve(fallbackId);
+                    console.error('Error logging to RTDB:', error);
+                    resolve(uniqueId); // Still resolve to continue app flow
                 });
+            } else {
+                console.warn('RTDB not available, using fallback ID');
+                resolve(uniqueId);
+            }
         } catch (error) {
             console.error('Exception in logUserVisit:', error);
             // Generate a fallback ID to avoid later errors
@@ -488,29 +750,11 @@ async function logGeneration(results) {
     try {
         const timestamp = new Date().toISOString();
         
-        // Create a simplified generation record
+        // Create a generation record
         const generation = {
             userId: userInfo.userId,
             userName: userInfo.name,
-            timestamp: timestamp,
-            assignments: results.map(result => ({
-                type: result.type,
-                title: result.title
-            }))
-        };
-        
-        // Add to user's generations array
-        userInfo.generations.push(generation);
-        
-        // Update the generations array in the user document
-        await db.collection('users').doc(userInfo.userId).update({
-            generations: userInfo.generations
-        });
-        
-        // Create a separate log in the generation_logs collection
-        const generationLog = {
-            userId: userInfo.userId,
-            userName: userInfo.name,
+            userSubject: userInfo.subject,
             timestamp: timestamp,
             assignments: results.map(result => ({
                 type: result.type,
@@ -522,9 +766,48 @@ async function logGeneration(results) {
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
         
-        const docRef = await db.collection('generation_logs').add(generationLog);
-        console.log('Generation logged with ID:', docRef.id);
+        // Add to user's generations array
+        userInfo.generations.push(generation);
         
+        // Get IP address if not already collected
+        if (!userInfo.ipAddress) {
+            try {
+                const ipInfo = await fetchIPInfo();
+                if (ipInfo) {
+                    generation.ipAddress = ipInfo.ip;
+                    generation.ipLocation = {
+                        country: ipInfo.country_name || '',
+                        city: ipInfo.city || '',
+                        region: ipInfo.region || ''
+                    };
+                }
+            } catch (error) {
+                console.error("Error fetching IP info for generation log:", error);
+            }
+        } else {
+            generation.ipAddress = userInfo.ipAddress;
+            generation.ipLocation = userInfo.ipLocation;
+        }
+        
+        // Only log to Realtime Database
+        if (rtdb) {
+            // Generate a unique ID for this generation
+            const genId = 'gen_' + new Date().getTime();
+            
+            // Log generation details
+            const rtdbRef = rtdb.ref('generations/' + genId);
+            await rtdbRef.set({
+                ...generation,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            // Update user's generations array
+            await rtdb.ref('users/' + userInfo.userId + '/generations').set(userInfo.generations);
+            
+            console.log('Generation logged to RTDB successfully with ID:', genId);
+        } else {
+            console.warn('RTDB not available, generation not logged');
+        }
     } catch (error) {
         console.error('Error logging generation:', error);
     }
@@ -541,26 +824,45 @@ async function logLinkedinClick() {
         // Increment the counter
         userInfo.linkedinClicks += 1;
         
-        // Log the click to Firebase
-        const linkedinClick = {
-            userId: userInfo.userId,
-            userName: userInfo.name,
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            platform: navigator.platform
-        };
-        
-        // Add to LinkedIn clicks collection
-        await db.collection('linkedin_clicks').add(linkedinClick);
-        
-        // Update the user document
-        await db.collection('users').doc(userInfo.userId).update({
-            linkedinClicks: userInfo.linkedinClicks
-        });
-        
-        console.log('LinkedIn click logged');
+        // Log the click to Firebase RTDB
+        if (rtdb) {
+            const linkedinClick = {
+                userId: userInfo.userId,
+                userName: userInfo.name,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                userAgent: navigator.userAgent,
+                platform: navigator.platform
+            };
+            
+            // Generate a unique click ID
+            const clickId = 'click_' + new Date().getTime();
+            
+            // Add to LinkedIn clicks collection in RTDB
+            await rtdb.ref('linkedin_clicks/' + clickId).set(linkedinClick);
+            
+            // Update the user document in RTDB
+            await rtdb.ref('users/' + userInfo.userId + '/linkedinClicks').set(userInfo.linkedinClicks);
+            
+            console.log('LinkedIn click logged to RTDB');
+        } else {
+            console.warn('RTDB not available, LinkedIn click not logged');
+        }
     } catch (error) {
         console.error('Error logging LinkedIn click:', error);
+    }
+}
+
+// Fetch IP information
+async function fetchIPInfo() {
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching IP info:', error);
+        return null;
     }
 }
 
@@ -577,19 +879,7 @@ function collectUserInfo() {
         userInfo.connectionType = navigator.connection.effectiveType;
     }
     
-    // Get location (approximate)
-    fetch('https://ipapi.co/json/')
-        .then(response => response.json())
-        .then(data => {
-            userInfo.location = {
-                country: data.country_name,
-                city: data.city,
-                region: data.region
-            };
-        })
-        .catch(error => {
-            console.error('Error getting location:', error);
-        });
+    // Will attempt to get location info later at login time
 }
 
 // Initialize the application
@@ -602,4 +892,51 @@ function init() {
 
 // Start the application
 console.log("Starting application");
-init(); 
+init();
+
+// Add CSS styles for the results
+(function addStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 0.75rem;
+        }
+        
+        .result-card-content {
+            line-height: 1.6;
+            text-align: justify;
+        }
+        
+        .result-card-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .result-card-content strong {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .result-card-content em {
+            font-style: italic;
+            color: #555;
+        }
+        
+        .word-count {
+            font-size: 0.85rem;
+            color: #666;
+            text-align: right;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-style: italic;
+        }
+    `;
+    document.head.appendChild(style);
+})(); 
