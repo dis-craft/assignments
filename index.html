@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Generator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="welcome-section" id="welcome-section">
+            <h1>Smart Assignment Generator</h1>
+            <p>Generate unique, plagiarism-free assignments instantly</p>
+            <form id="name-form" onsubmit="return false;">
+                <div class="input-group">
+                    <input type="text" id="user-name" placeholder="Enter your name" required>
+                    <button type="button" id="start-btn">Get Started</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="main-section hidden" id="main-section">
+            <header>
+                <h1>Assignment Generator</h1>
+                <div class="user-info">
+                    <span id="user-name-display">Welcome!</span>
+                </div>
+            </header>
+
+            <div class="assignment-options">
+                <h2>Select Assignments to Generate</h2>
+                <div class="option-grid">
+                    <div class="option">
+                        <input type="checkbox" id="assignment1" checked>
+                        <label for="assignment1">
+                            <span class="option-title">Present Tense Story</span>
+                            <span class="option-desc">A 275-word story using all categories of Present tense</span>
+                            <span class="marks">10 Marks</span>
+                        </label>
+                    </div>
+                    <div class="option">
+                        <input type="checkbox" id="assignment2" checked>
+                        <label for="assignment2">
+                            <span class="option-title">Communication Skills Essay</span>
+                            <span class="option-desc">Essay on importance of communication skills in a digital age</span>
+                            <span class="marks">10 Marks</span>
+                        </label>
+                    </div>
+                    <div class="option">
+                        <input type="checkbox" id="assignment3" checked>
+                        <label for="assignment3">
+                            <span class="option-title">AI Paragraph</span>
+                            <span class="option-desc">A paragraph on Artificial Intelligence</span>
+                            <span class="marks">5 Marks</span>
+                        </label>
+                    </div>
+                </div>
+                <button id="generate-btn" class="generate-button">
+                    <i class="fas fa-magic"></i> Generate Assignments
+                </button>
+                <div class="loader hidden" id="loader">
+                    <div class="spinner"></div>
+                    <p>Generating unique content...</p>
+                </div>
+            </div>
+
+            <div class="results-section" id="results-section">
+                <!-- Results will be inserted here by JavaScript -->
+            </div>
+        </div>
+
+        <footer class="footer">
+            Designed and developed by <a href="https://www.linkedin.com/in/srikar-t-118581286/" target="_blank">Srikar</a>
+        </footer>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <script src="main.js"></script>
+</body>
+</html> 
