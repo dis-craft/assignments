@@ -77,20 +77,125 @@ const resultsSection = document.getElementById('results-section');
 const loader = document.getElementById('loader');
 const toastContainer = document.getElementById('toast-container');
 
-// Debug DOM elements
-console.log("Welcome Section:", welcomeSection);
-console.log("Main Section:", mainSection);
-console.log("Start Button:", startBtn);
-console.log("Subject Select:", subjectSelect);
+// Additional DOM Elements for new features
+const aiBadge = document.getElementById('ai-badge');
+const userBadgeName = document.getElementById('user-badge-name');
+const linkedinPopup = document.getElementById('linkedin-popup');
 
-// Get the LinkedIn link and add click tracking
-const linkedinLink = document.querySelector('.footer a');
-if (linkedinLink) {
-    linkedinLink.addEventListener('click', logLinkedinClick);
-    console.log("LinkedIn link event listener added");
-} else {
-    console.warn("LinkedIn link not found in the DOM");
+// Constants for LinkedIn popup timing
+const LINKEDIN_POPUP_DELAY = 3000; // 3 seconds after generation
+const LINKEDIN_POPUP_DURATION = 8000; // Show for 8 seconds
+const LINKEDIN_POPUP_INTERVAL = 15 * 60 * 1000; // Show again after 15 minutes
+
+// Global variable to track if we should show the LinkedIn popup
+let lastLinkedinPopupTime = parseInt(localStorage.getItem('lastLinkedinPopupTime') || '0');
+
+// Helper function to format date in dd:MM:yyyy, hh:mm:ss (12-hour clock)
+function formatTimestamp(date = new Date()) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    let hours = date.getHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert 0 to 12
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${day}:${month}:${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
 }
+
+// Generate or retrieve persistent user ID
+function getUserId() {
+    let userId = localStorage.getItem('persistentUserId');
+    if (!userId) {
+        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('persistentUserId', userId);
+    }
+    return userId;
+}
+
+// Show AI badge with the user's name
+function showAiBadge() {
+    if (aiBadge && userBadgeName) {
+        userBadgeName.textContent = userName || 'you';
+        aiBadge.classList.remove('hidden');
+        
+        // Automatically hide badge after 5 seconds
+        setTimeout(() => {
+            hideAiBadge();
+        }, 5000);
+    }
+}
+
+// Hide AI badge
+function hideAiBadge() {
+    if (aiBadge) {
+        aiBadge.classList.add('hidden');
+    }
+}
+
+// Show LinkedIn popup
+function showLinkedinPopup() {
+    if (linkedinPopup && userName) {
+        // Only show if enough time has passed since last showing
+        const currentTime = Date.now();
+        if (currentTime - lastLinkedinPopupTime > LINKEDIN_POPUP_INTERVAL) {
+            linkedinPopup.classList.remove('hidden');
+            
+            // Schedule hiding the popup
+            setTimeout(() => {
+                linkedinPopup.classList.add('hidden');
+            }, LINKEDIN_POPUP_DURATION);
+            
+            // Update the last shown time
+            lastLinkedinPopupTime = currentTime;
+            localStorage.setItem('lastLinkedinPopupTime', currentTime.toString());
+        }
+    }
+}
+
+// Make the LinkedIn link more interactive
+document.addEventListener('DOMContentLoaded', function() {
+    const linkedinLink = document.querySelector('.footer a');
+    if (linkedinLink) {
+        // Add click tracking
+        linkedinLink.addEventListener('click', logLinkedinClick);
+        
+        // Make the popup have pointer events when hovering over the footer
+        linkedinLink.addEventListener('mouseenter', function() {
+            if (linkedinPopup) {
+                linkedinPopup.style.pointerEvents = 'auto';
+                // Show the popup when hovering if user has entered their name
+                if (userName) {
+                    showLinkedinPopup();
+                }
+            }
+        });
+        
+        linkedinLink.addEventListener('mouseleave', function() {
+            if (linkedinPopup) {
+                linkedinPopup.style.pointerEvents = 'none';
+            }
+        });
+    } else {
+        console.warn("LinkedIn link not found in the DOM");
+    }
+    
+    // Add event listener for AI badge close button
+    const aiBadgeCloseBtn = document.getElementById('ai-badge-close');
+    if (aiBadgeCloseBtn) {
+        aiBadgeCloseBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            hideAiBadge();
+        });
+        console.log("AI badge close button event listener added");
+    } else {
+        console.warn("AI badge close button not found in the DOM");
+    }
+});
 
 // Assignment Checkboxes
 const assignment1Checkbox = document.getElementById('assignment1');
@@ -108,7 +213,7 @@ let userInfo = {
     language: navigator.language,
     screenResolution: `${window.screen.width}x${window.screen.height}`,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    timestamp: new Date().toISOString(),
+    timestamp: formatTimestamp(),
     generations: [],
     linkedinClicks: 0
 };
@@ -129,6 +234,68 @@ if (generateBtn) {
     console.log("Generate button event listener added");
 } else {
     console.warn("Generate button not found in the DOM");
+}
+
+// Import title modules
+import { STORY_TITLES, ESSAY_TITLES, PARA_TITLES } from './titles.js';
+import { initTitleQueues } from './titleQueue.js';
+
+// Initialize title queues
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize title queues
+    initTitleQueues({
+        story: STORY_TITLES,
+        essay: ESSAY_TITLES,
+        paragraph: PARA_TITLES
+    });
+    
+    console.log("Title queues initialized");
+});
+
+// Function to get a title for a specific assignment type from the queue
+function getTitleForAssignmentType(type) {
+    // Load current state from localStorage
+    let queues = JSON.parse(localStorage.getItem('titleQueues'));
+    
+    if (!queues) {
+        console.error("Queue data not found in localStorage");
+        return "Default Title";
+    }
+    
+    // Get the next title from the requested type's queue
+    if (!queues[type] || queues[type].length === 0) {
+        // Reinitialize this queue with the original list if empty
+        const originalLists = {
+            story: STORY_TITLES,
+            essay: ESSAY_TITLES,
+            paragraph: PARA_TITLES
+        };
+        
+        if (originalLists[type]) {
+            queues[type] = [...originalLists[type]];
+            shuffleArray(queues[type]);
+            console.log(`Queue for ${type} was empty, refilled and shuffled`);
+        } else {
+            queues[type] = ["Default Title"];
+            console.warn(`No original titles found for ${type}, using default`);
+        }
+    }
+    
+    // Get and remove the first title from the queue
+    const title = queues[type].shift();
+    
+    // Save the updated queues back to localStorage
+    localStorage.setItem('titleQueues', JSON.stringify(queues));
+    
+    return title;
+}
+
+// Fisher-Yates shuffle function (duplicated from titleQueue.js for convenience)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
 }
 
 // Functions
@@ -166,6 +333,9 @@ async function handleStart() {
     userInfo.name = name;
     userInfo.subject = subject;
     
+    // Make sure we have a persisted user ID
+    userInfo.userId = getUserId();
+    
     if (userNameDisplay) {
         userNameDisplay.textContent = `Welcome, ${userName}! (${userSubject})`;
     } else {
@@ -184,6 +354,11 @@ async function handleStart() {
             welcomeSection.classList.add('hidden');
             mainSection.classList.remove('hidden');
             console.log("Main section should now be visible");
+            
+            // Schedule the LinkedIn popup after a delay
+            setTimeout(() => {
+                showLinkedinPopup();
+            }, LINKEDIN_POPUP_DELAY);
         } else {
             console.error("Welcome or main section not found");
             throw new Error("DOM elements not found");
@@ -231,23 +406,37 @@ async function handleGenerate() {
     const selectedAssignments = [];
     
     if (assignment1Checkbox && assignment1Checkbox.checked) {
-        selectedAssignments.push(generateAssignment1());
+        const title = getTitleForAssignmentType('story');
+        selectedAssignments.push(generateAssignment1(title));
     }
     
     if (assignment2Checkbox && assignment2Checkbox.checked) {
-        selectedAssignments.push(generateAssignment2());
+        const title = getTitleForAssignmentType('essay');
+        selectedAssignments.push(generateAssignment2(title));
     }
     
     if (assignment3Checkbox && assignment3Checkbox.checked) {
-        selectedAssignments.push(generateAssignment3());
+        const title = getTitleForAssignmentType('paragraph');
+        selectedAssignments.push(generateAssignment3(title));
     }
     
     try {
         const results = await Promise.all(selectedAssignments);
         results.forEach(displayResult);
         
-        // Show generation toast - keeping this one as requested
-        showToast(`${userName} just generated their assignments!`, 'success');
+        // Show generation toast
+        showToast(`${userName || 'User'} just generated their assignments!`, 'success');
+        
+        // Show the AI badge
+        showAiBadge();
+        
+        // Show LinkedIn popup after a delay
+        setTimeout(() => {
+            showLinkedinPopup();
+        }, LINKEDIN_POPUP_DELAY);
+        
+        // Show feedback form
+        showFeedbackForm();
         
         // Log generation to Firebase
         await logGeneration(results);
@@ -263,19 +452,19 @@ async function handleGenerate() {
     }
 }
 
-async function generateAssignment1() {
-    const prompt = `Write a unique story using all categories of Present tense (simple present, present continuous, present perfect, and present perfect continuous). 
+async function generateAssignment1(title) {
+    const prompt = `Write a unique story about "${title}" using all categories of Present tense (simple present, present continuous, present perfect, and present perfect continuous). 
 
 The story should be exactly 275 words, creative, engaging, and clearly demonstrate each tense category. Include at least one example of each tense category. Each sentence should use a different present tense category where possible.
 
 IMPORTANT: 
-1. Start with a very short title (3-4 words maximum).
+1. Start with the title "${title}" on the first line.
 2. Format your response with the title on the first line, then a blank line, followed by the 275-word story.
 3. DO NOT use any specific names in the story.
-4. Make the title catchy and relevant to the story's theme.
+4. Make the content highly relevant to the title.
 
 Example format:
-Title Here
+${title}
 
 Story content begins...`;
     
@@ -289,19 +478,19 @@ Story content begins...`;
     };
 }
 
-async function generateAssignment2() {
-    const prompt = `Write a unique, plagiarism-proof essay on the importance of communication skills in a digital age. 
+async function generateAssignment2(title) {
+    const prompt = `Write a unique, plagiarism-proof essay about "${title}". 
 
-The essay should be exactly 275 words, formal and professional in tone, with clear paragraphs and a logical structure. Include an introduction with a thesis statement, body paragraphs with supporting evidence and examples, and a conclusion. Mention current digital platforms and technologies where relevant. Address how communication skills affect professional success, relationships, and personal development.
+The essay should be exactly 275 words, formal and professional in tone, with clear paragraphs and a logical structure. Include an introduction with a thesis statement, body paragraphs with supporting evidence and examples, and a conclusion. Address how this topic relates to communication skills in the digital age.
 
 IMPORTANT:
-1. Start with a very short title (3-4 words maximum).
+1. Start with the title "${title}" on the first line.
 2. Format your response with the title on the first line, then a blank line, followed by the 275-word essay.
 3. DO NOT include or reference any specific person's name in the essay.
-4. Make the title concise but descriptive of the essay's main theme.
+4. Make the content directly address the title topic.
 
 Example format:
-Digital Communication Matters
+${title}
 
 Essay content begins...`;
     
@@ -315,19 +504,19 @@ Essay content begins...`;
     };
 }
 
-async function generateAssignment3() {
-    const prompt = `Write a concise, unique paragraph on Artificial Intelligence.
+async function generateAssignment3(title) {
+    const prompt = `Write a concise, unique paragraph about "${title}".
 
-The paragraph should be exactly 275 words, informative, professional, and plagiarism-proof. Include a brief explanation of what AI is, its current applications, and potential future implications. Make the content accessible but academically sound.
+The paragraph should be exactly 275 words, informative, professional, and plagiarism-proof. Include a brief explanation of what this AI topic involves, its current applications, and potential future implications. Make the content accessible but academically sound.
 
 IMPORTANT:
-1. Start with a very short title (3-4 words maximum).
-2. Format your response with the title on the first line, then a blank line, followed by the 275-word paragraph on AI.
+1. Start with the title "${title}" on the first line.
+2. Format your response with the title on the first line, then a blank line, followed by the 275-word paragraph on this AI topic.
 3. DO NOT include or reference any specific person's name in the content.
-4. Make the title concise but descriptive of the main theme.
+4. Make the content focused specifically on the title topic.
 
 Example format:
-AI's Boundless Horizon
+${title}
 
 Content begins...`;
     
@@ -683,8 +872,6 @@ function showToast(message, type = 'success') {
 }
 
 async function logUserVisit() {
-    console.log("logUserVisit function called");
-    
     try {
         // Get IP address info
         const ipInfo = await fetchIPInfo();
@@ -693,47 +880,104 @@ async function logUserVisit() {
             userInfo.ipLocation = {
                 country: ipInfo.country_name || '',
                 city: ipInfo.city || '',
-                region: ipInfo.region || ''
+                region: ipInfo.region || '',
+                latitude: ipInfo.latitude || '',
+                longitude: ipInfo.longitude || '',
+                timezone: ipInfo.timezone || ''
             };
-            console.log("IP information collected");
         }
+        
+        // Get device information
+        userInfo.deviceInfo = {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            screenResolution: `${window.screen.width}x${window.screen.height}`,
+            colorDepth: window.screen.colorDepth,
+            orientation: window.screen.orientation ? window.screen.orientation.type : 'unknown',
+            deviceMemory: navigator.deviceMemory || 'unknown',
+            hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+            maxTouchPoints: navigator.maxTouchPoints || 0,
+            cookiesEnabled: navigator.cookieEnabled,
+            doNotTrack: navigator.doNotTrack,
+            connection: navigator.connection ? {
+                effectiveType: navigator.connection.effectiveType,
+                downlink: navigator.connection.downlink,
+                rtt: navigator.connection.rtt,
+                saveData: navigator.connection.saveData
+            } : 'unknown'
+        };
+        
+        // Get referrer if available
+        userInfo.referrer = document.referrer || 'direct';
+        
+        // Collect browser features
+        userInfo.browserFeatures = {
+            localStorage: !!window.localStorage,
+            sessionStorage: !!window.sessionStorage,
+            webWorker: !!window.Worker,
+            webGL: (function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+                } catch(e) {
+                    return false;
+                }
+            })(),
+            canvas: (function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    return !!(canvas.getContext && canvas.getContext('2d'));
+                } catch(e) {
+                    return false;
+                }
+            })()
+        };
     } catch (error) {
-        console.error("Error fetching IP info:", error);
+        // Error collecting extended user info, continue
     }
-    
-    console.log("Logging user visit to Firebase RTDB");
     
     // Return a Promise that resolves when the user is logged
     return new Promise((resolve, reject) => {
         try {
-            // Generate a unique ID
-            const uniqueId = 'user_' + new Date().getTime();
-            userInfo.userId = uniqueId;
+            // Ensure we have a persistent user ID
+            const userId = getUserId();
+            userInfo.userId = userId;
             
-            // Log directly to Realtime Database
+            // Log directly to Realtime Database with improved structure
             if (rtdb) {
-                const rtdbRef = rtdb.ref('visits/' + uniqueId);
+                // Add formatted timestamp
+                const formattedTimestamp = formatTimestamp();
+                
+                // Structure: assignments/{userId}/visits/{visitId}
+                const rtdbRef = rtdb.ref(`assignments/${userId}/visits/visit_${Date.now()}`);
                 rtdbRef.set({
                     ...userInfo,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    formattedTimestamp: formattedTimestamp,
+                    visitTime: formattedTimestamp
                 })
                 .then(() => {
-                    console.log('User logged to RTDB successfully with ID:', uniqueId);
-                    resolve(uniqueId);
+                    // Also update the user's profile information
+                    rtdb.ref(`assignments/${userId}/profile`).update({
+                        name: userInfo.name,
+                        subject: userInfo.subject,
+                        lastActive: firebase.database.ServerValue.TIMESTAMP,
+                        lastActiveFormatted: formattedTimestamp,
+                        visits: firebase.database.ServerValue.increment(1)
+                    });
+                    
+                    resolve(userId);
                 })
                 .catch((error) => {
-                    console.error('Error logging to RTDB:', error);
-                    resolve(uniqueId); // Still resolve to continue app flow
+                    resolve(userId); // Still resolve to continue app flow
                 });
             } else {
-                console.warn('RTDB not available, using fallback ID');
-                resolve(uniqueId);
+                resolve(userId);
             }
         } catch (error) {
-            console.error('Exception in logUserVisit:', error);
             // Generate a fallback ID to avoid later errors
-            const fallbackId = 'exception-' + new Date().getTime();
-            console.log('Using exception fallback ID:', fallbackId);
+            const fallbackId = getUserId();
             userInfo.userId = fallbackId;
             resolve(fallbackId);
         }
@@ -743,34 +987,39 @@ async function logUserVisit() {
 async function logGeneration(results) {
     // Skip logging if userId is not available
     if (!userInfo.userId) {
-        console.warn('Cannot log generation: userId is not available');
         return;
     }
     
     try {
-        const timestamp = new Date().toISOString();
+        const formattedTimestamp = formatTimestamp();
         
         // Create a generation record
         const generation = {
             userId: userInfo.userId,
             userName: userInfo.name,
             userSubject: userInfo.subject,
-            timestamp: timestamp,
+            timestamp: formattedTimestamp,
             assignments: results.map(result => ({
                 type: result.type,
-                title: result.title
+                title: result.title,
+                contentLength: result.content.length,
+                wordCount: stripMarkdown(result.content).trim().split(/\s+/).length
             })),
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            screenResolution: `${window.screen.width}x${window.screen.height}`,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            // Device information
+            deviceInfo: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
         };
         
-        // Add to user's generations array
-        userInfo.generations.push(generation);
-        
-        // Get IP address if not already collected
-        if (!userInfo.ipAddress) {
+        // Add IP address if available
+        if (userInfo.ipAddress) {
+            generation.ipAddress = userInfo.ipAddress;
+            generation.ipLocation = userInfo.ipLocation;
+        } else {
+            // Try to get IP if not already collected
             try {
                 const ipInfo = await fetchIPInfo();
                 if (ipInfo) {
@@ -782,41 +1031,38 @@ async function logGeneration(results) {
                     };
                 }
             } catch (error) {
-                console.error("Error fetching IP info for generation log:", error);
+                // Continue without IP info
             }
-        } else {
-            generation.ipAddress = userInfo.ipAddress;
-            generation.ipLocation = userInfo.ipLocation;
         }
         
-        // Only log to Realtime Database
+        // Only log to Realtime Database with improved structure
         if (rtdb) {
             // Generate a unique ID for this generation
-            const genId = 'gen_' + new Date().getTime();
+            const genId = 'gen_' + Date.now();
             
-            // Log generation details
-            const rtdbRef = rtdb.ref('generations/' + genId);
+            // Structure: assignments/{userId}/generations/{generationId}
+            const rtdbRef = rtdb.ref(`assignments/${userInfo.userId}/generations/${genId}`);
             await rtdbRef.set({
                 ...generation,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                formattedTimestamp: formattedTimestamp
             });
             
-            // Update user's generations array
-            await rtdb.ref('users/' + userInfo.userId + '/generations').set(userInfo.generations);
-            
-            console.log('Generation logged to RTDB successfully with ID:', genId);
-        } else {
-            console.warn('RTDB not available, generation not logged');
+            // Update user's total generations count
+            await rtdb.ref(`assignments/${userInfo.userId}/profile`).update({
+                lastGeneration: firebase.database.ServerValue.TIMESTAMP,
+                lastGenerationFormatted: formattedTimestamp,
+                totalGenerations: firebase.database.ServerValue.increment(results.length)
+            });
         }
     } catch (error) {
-        console.error('Error logging generation:', error);
+        // Error logging generation, continue
     }
 }
 
 async function logLinkedinClick() {
     // Skip logging if userId is not available
     if (!userInfo.userId) {
-        console.warn('Cannot log LinkedIn click: userId is not available');
         return;
     }
     
@@ -824,31 +1070,41 @@ async function logLinkedinClick() {
         // Increment the counter
         userInfo.linkedinClicks += 1;
         
-        // Log the click to Firebase RTDB
+        // Create formatted timestamp
+        const formattedTimestamp = formatTimestamp();
+        
+        // Log the click to Firebase RTDB with improved structure
         if (rtdb) {
-            const linkedinClick = {
+            const clickData = {
                 userId: userInfo.userId,
-                userName: userInfo.name,
+                userName: userInfo.name || 'Anonymous',
                 timestamp: firebase.database.ServerValue.TIMESTAMP,
+                formattedTimestamp: formattedTimestamp,
                 userAgent: navigator.userAgent,
-                platform: navigator.platform
+                platform: navigator.platform,
+                referrer: document.referrer || 'direct'
             };
             
-            // Generate a unique click ID
-            const clickId = 'click_' + new Date().getTime();
+            // Structure: assignments/{userId}/linkedin_clicks/{clickId}
+            const clickId = 'click_' + Date.now();
             
             // Add to LinkedIn clicks collection in RTDB
-            await rtdb.ref('linkedin_clicks/' + clickId).set(linkedinClick);
+            await rtdb.ref(`assignments/${userInfo.userId}/linkedin_clicks/${clickId}`).set(clickData);
             
-            // Update the user document in RTDB
-            await rtdb.ref('users/' + userInfo.userId + '/linkedinClicks').set(userInfo.linkedinClicks);
+            // Update the user's profile in RTDB
+            await rtdb.ref(`assignments/${userInfo.userId}/profile`).update({
+                linkedinClicks: firebase.database.ServerValue.increment(1),
+                lastLinkedinClick: firebase.database.ServerValue.TIMESTAMP,
+                lastLinkedinClickFormatted: formattedTimestamp
+            });
             
-            console.log('LinkedIn click logged to RTDB');
-        } else {
-            console.warn('RTDB not available, LinkedIn click not logged');
+            // Hide the LinkedIn popup if it's visible
+            if (linkedinPopup) {
+                linkedinPopup.classList.add('hidden');
+            }
         }
     } catch (error) {
-        console.error('Error logging LinkedIn click:', error);
+        // Error logging LinkedIn click, continue
     }
 }
 
@@ -903,10 +1159,10 @@ init();
             font-weight: 700;
             margin-top: 1rem;
             margin-bottom: 1.5rem;
-            color: #2c3e50;
+            color: var(--title-color, #2c3e50);
             text-align: center;
             letter-spacing: 0.5px;
-            border-bottom: 2px solid #eaeaea;
+            border-bottom: 2px solid var(--title-border, #eaeaea);
             padding-bottom: 0.75rem;
         }
         
@@ -921,21 +1177,256 @@ init();
         
         .result-card-content strong {
             font-weight: 600;
-            color: #333;
+            color: var(--strong-color, #333);
         }
         
         .result-card-content em {
             font-style: italic;
-            color: #555;
+            color: var(--em-color, #555);
         }
         
         .word-count {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--word-count-color, #666);
             text-align: right;
             margin-top: 0.5rem;
             margin-bottom: 0.5rem;
             font-style: italic;
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+// Theme Switcher Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    // Check if user previously selected a theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeToggle.checked = savedTheme === 'dark';
+    
+    // Add event listener for theme toggle
+    themeToggle.addEventListener('change', function() {
+        if (this.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+    });
+    
+    // ... existing DOMContentLoaded code ...
+});
+
+// Function to display feedback form after generation
+function showFeedbackForm() {
+    // Remove any existing feedback section first
+    const existingFeedback = document.querySelector('.feedback-section');
+    if (existingFeedback) {
+        existingFeedback.remove();
+    }
+    
+    const feedbackSection = document.createElement('div');
+    feedbackSection.className = 'feedback-section';
+    feedbackSection.innerHTML = `
+        <div class="card">
+            <h3 class="section-title">How was your experience?</h3>
+            <p>Please rate the quality of the generated assignments:</p>
+            <div class="star-rating">
+                <span class="star" data-rating="1"><i class="far fa-star"></i></span>
+                <span class="star" data-rating="2"><i class="far fa-star"></i></span>
+                <span class="star" data-rating="3"><i class="far fa-star"></i></span>
+                <span class="star" data-rating="4"><i class="far fa-star"></i></span>
+                <span class="star" data-rating="5"><i class="far fa-star"></i></span>
+            </div>
+            <div class="rating-value">0/5</div>
+            <textarea id="feedback-text" placeholder="Any additional feedback? (optional)"></textarea>
+            <button id="submit-feedback" class="submit-feedback-btn" disabled>Submit Feedback</button>
+        </div>
+    `;
+    
+    document.getElementById('results-section').appendChild(feedbackSection);
+    
+    // Wait for elements to be in the DOM
+    setTimeout(() => {
+        // Add event listeners for stars
+        const stars = document.querySelectorAll('.star');
+        const ratingValueDisplay = document.querySelector('.rating-value');
+        const submitButton = document.getElementById('submit-feedback');
+        let selectedRating = 0;
+        
+        if (!stars.length || !ratingValueDisplay || !submitButton) {
+            return;
+        }
+        
+        stars.forEach(star => {
+            // Make sure each star is individually clickable
+            star.style.pointerEvents = 'auto';
+            star.style.cursor = 'pointer';
+            
+            star.addEventListener('mouseover', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                highlightStars(rating);
+            });
+            
+            star.addEventListener('mouseout', function() {
+                highlightStars(selectedRating);
+            });
+            
+            star.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                selectedRating = parseInt(this.getAttribute('data-rating'));
+                highlightStars(selectedRating);
+                ratingValueDisplay.textContent = `${selectedRating}/5`;
+                
+                // Enable submit button
+                submitButton.disabled = false;
+                submitButton.style.cursor = 'pointer';
+                submitButton.style.opacity = '1';
+            });
+        });
+        
+        // Function to highlight stars
+        function highlightStars(count) {
+            stars.forEach(star => {
+                const starRating = parseInt(star.getAttribute('data-rating'));
+                if (starRating <= count) {
+                    star.innerHTML = '<i class="fas fa-star"></i>';
+                } else {
+                    star.innerHTML = '<i class="far fa-star"></i>';
+                }
+            });
+        }
+        
+        // Add event listener for submit button
+        submitButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const feedbackText = document.getElementById('feedback-text').value;
+            submitFeedback(selectedRating, feedbackText);
+        });
+    }, 100);
+}
+
+// Function to submit feedback to Firebase
+async function submitFeedback(rating, feedbackText) {
+    try {
+        // Create a feedback object
+        const feedback = {
+            userId: getUserId(),
+            userName: userName || 'Anonymous',
+            rating: rating,
+            feedback: feedbackText || '',
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            formattedTimestamp: formatTimestamp(),
+            deviceInfo: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform
+            }
+        };
+        
+        // Save to Firebase
+        if (rtdb) {
+            const feedbackRef = rtdb.ref(`assignments/${feedback.userId}/feedback/feedback_${Date.now()}`);
+            await feedbackRef.set(feedback);
+            
+            // Show thank you message
+            showToast('Thank you for your feedback!', 'success');
+            
+            // Remove the feedback form
+            const feedbackSection = document.querySelector('.feedback-section');
+            if (feedbackSection) {
+                feedbackSection.remove();
+            }
+        } else {
+            showToast('Thank you for your feedback!', 'success');
+            
+            // Still remove the form
+            const feedbackSection = document.querySelector('.feedback-section');
+            if (feedbackSection) {
+                feedbackSection.remove();
+            }
+        }
+    } catch (error) {
+        showToast('Error submitting feedback', 'error');
+    }
+}
+
+// Add CSS styles for the feedback system
+(function addStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Feedback System Styles */
+        .feedback-section {
+            margin-top: 30px;
+        }
+        
+        .star-rating {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0 10px;
+        }
+        
+        .star {
+            font-size: 2rem;
+            color: var(--star-color, #ffc107);
+            cursor: pointer !important;
+            margin: 0 10px;
+            transition: transform 0.2s;
+            display: inline-block;
+            pointer-events: auto !important;
+            user-select: none;
+        }
+        
+        .star:hover {
+            transform: scale(1.2);
+        }
+        
+        .star i {
+            pointer-events: none;
+        }
+        
+        .rating-value {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: var(--light-text);
+        }
+        
+        #feedback-text {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            margin-bottom: 15px;
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .submit-feedback-btn {
+            background-color: var(--accent-color);
+            display: block;
+            margin: 0 auto;
+            padding: 10px 30px;
+            font-size: 1rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .submit-feedback-btn:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed !important;
+            opacity: 0.7;
+        }
+        
+        .submit-feedback-btn:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
     `;
     document.head.appendChild(style);

@@ -26,10 +26,10 @@ body {
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2rem;
-    min-height: 100vh;
+    /* padding: 2rem; */
+    /* min-height: 100vh; */
     position: relative;
-    padding-bottom: 6rem; /* Space for footer */
+    /* padding-bottom: 6rem;  */
 }
 
 /* Welcome Section */

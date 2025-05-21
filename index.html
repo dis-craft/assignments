@@ -1,39 +1,710 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assignment Generator</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Smart Assignment Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        :root {
+            /* Light Theme (default variables) */
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --accent-color: #4caf50;
+            --text-color: #333;
+            --light-text: #666;
+            --lighter-text: #999;
+            --bg-color: #f9f9f9;
+            --card-bg: #fff;
+            --border-color: #e0e0e0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --button-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            --blue-button: #4568dc;
+            --blue-button-hover: #3a57c4;
+        }
+        
+        /* Dark Theme */
+        [data-theme="dark"] {
+            --primary-color: #5d8ac3;
+            --secondary-color: #2980b9;
+            --accent-color: #5cbb63;
+            --text-color: #e0e0e0;
+            --light-text: #b0b0b0;
+            --lighter-text: #888;
+            --bg-color: #1a1a1a;
+            --card-bg: #2a2a2a;
+            --border-color: #444;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --button-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            --blue-button: #5171e0;
+            --blue-button-hover: #3f5bc8;
+            --input-bg: #333;
+            --input-border: #555;
+            --input-placeholder: #888;
+            --linkedin-bg: #222;
+            --linkedin-text: #e0e0e0;
+            --linkedin-border: #0077B5;
+            --linkedin-arrow: #222;
+            --star-color: #ffc107;
+            --title-color: #7dacd6;
+            --title-border: #3a3a3a;
+            --strong-color: #d1d1d1;
+            --em-color: #b0b0b0;
+            --word-count-color: #888;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            color: var(--light-text);
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+        
+        .section-title {
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Welcome Section */
+        #welcome-section {
+            text-align: center;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--light-text);
+            font-weight: 500;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: var(--input-placeholder);
+        }
+        
+        input:focus, select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        .select-wrapper {
+            position: relative;
+            max-width: 300px;
+            margin: 0 auto 20px;
+        }
+        
+        .select-wrapper::after {
+            content: '▼';
+            font-size: 0.7rem;
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--light-text);
+            pointer-events: none;
+        }
+        
+        /* Button Styles */
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: var(--button-shadow);
+            font-weight: 500;
+        }
+        
+        button:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #start-btn {
+            background-color: var(--blue-button);
+            padding: 12px 30px;
+            margin-top: 10px;
+        }
+        
+        #start-btn:hover {
+            background-color: var(--blue-button-hover);
+        }
+        
+        /* Main Section */
+        #main-section {
+            position: relative;
+        }
+        
+        #user-name-display {
+            color: var(--secondary-color);
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        /* Assignment Options */
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .option-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .option {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-bg);
+            transition: border-color 0.3s, transform 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .option input[type="checkbox"] {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .option label {
+            padding-left: 30px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        
+        .option:hover {
+            transform: translateY(-3px);
+            border-color: var(--primary-color);
+        }
+        
+        .option-title {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .option-desc {
+            color: var(--light-text);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            flex-grow: 1;
+        }
+        
+        .marks {
+            align-self: flex-end;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: auto;
+        }
+        
+        .generate-button {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .generate-button i {
+            margin-right: 10px;
+        }
+        
+        /* Results Section */
+        .result-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--accent-color);
+        }
+        
+        .result-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .result-card h3 i {
+            margin-right: 10px;
+            color: var(--accent-color);
+        }
+        
+        .action-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .copy-btn {
+            background-color: var(--accent-color);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .copy-btn:hover {
+            background-color: #3d8b40;
+        }
+        
+        /* Loader */
+        #loader {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background-color: white;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            min-width: 300px;
+            max-width: 400px;
+            border-left: 4px solid;
+            position: relative;
+        }
+        
+        .toast.success {
+            border-left-color: #4caf50;
+        }
+        
+        .toast.error {
+            border-left-color: #f44336;
+        }
+        
+        .toast-icon {
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+        }
+        
+        .toast.success .toast-icon {
+            color: #4caf50;
+        }
+        
+        .toast.error .toast-icon {
+            color: #f44336;
+        }
+        
+        .toast-content {
+            flex: 1;
+        }
+        
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .toast-message {
+            color: var(--light-text);
+        }
+        
+        .toast-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: var(--lighter-text);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--lighter-text);
+        }
+        
+        .footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .result-card {
+                padding: 20px;
+            }
+        }
+
+        /* Assignment title display */
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            color: var(--title-color, #2c3e50);
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--title-border, #eaeaea);
+            padding-bottom: 0.75rem;
+        }
+        
+        .word-count {
+            font-size: 0.85rem;
+            color: var(--word-count-color, #666);
+            text-align: right;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-style: italic;
+        }
+        
+        /* AI-generated badge */
+        .ai-badge {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(74, 111, 165, 0.95);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.5s ease forwards;
+            max-width: 320px;
+        }
+        
+        .ai-badge i {
+            margin-right: 10px;
+            font-size: 1.1rem;
+            color: #8BBEE8;
+        }
+        
+        .ai-badge span {
+            flex: 1;
+        }
+        
+        .ai-badge-close {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 10px;
+            transition: color 0.2s ease;
+            box-shadow: none;
+        }
+        
+        .ai-badge-close:hover {
+            color: white;
+            background: none;
+            transform: none;
+        }
+        
+        .ai-badge:hover {
+            background-color: rgba(74, 111, 165, 1);
+            transform: translateY(-3px);
+        }
+        
+        @media (max-width: 480px) {
+            .ai-badge {
+                left: 10px;
+                right: 10px;
+                max-width: calc(100% - 20px);
+                padding: 10px 15px;
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* LinkedIn popup */
+        .linkedin-popup {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--linkedin-bg, white);
+            color: var(--linkedin-text, var(--text-color));
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            z-index: 90;
+            max-width: 300px;
+            border-left: 4px solid var(--linkedin-border, #0077B5);
+            animation: fadeInUp 0.5s ease forwards, pulse 2s infinite;
+            pointer-events: none;
+        }
+        
+        .linkedin-popup::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: var(--linkedin-arrow, white) transparent transparent;
+        }
+        
+        .linkedin-popup i {
+            color: #0077B5;
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 119, 181, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(0, 119, 181, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 119, 181, 0);
+            }
+        }
+        
+        .footer {
+            position: relative;
+        }
+        
+        /* Theme Switcher */
+        .theme-switch-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+        }
+        
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+        
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .theme-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+        
+        .theme-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .theme-slider {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .theme-slider:before {
+            transform: translateX(30px);
+        }
+        
+        .theme-switch-icon {
+            margin: 0 10px;
+            font-size: 1.2rem;
+            color: var(--text-color);
+        }
+    </style>
 </head>
 <body>
+    <!-- Theme Switcher -->
+    <div class="theme-switch-container">
+        <i class="fas fa-sun theme-switch-icon"></i>
+        <label class="theme-switch">
+            <input type="checkbox" id="theme-toggle" checked>
+            <span class="theme-slider"></span>
+        </label>
+        <i class="fas fa-moon theme-switch-icon"></i>
+    </div>
+
     <div class="container">
-        <div class="welcome-section" id="welcome-section">
+        <header>
             <h1>Smart Assignment Generator</h1>
-            <p>Generate unique, plagiarism-free assignments instantly</p>
-            <form id="name-form" onsubmit="return false;">
-                <div class="input-group">
-                    <input type="text" id="user-name" placeholder="Enter your name" required>
-                    <select id="subject-select" required>
-                        <option value="" disabled selected>Select Subject</option>
-                        <option value="english">English</option>
-                    </select>
-                    <button type="button" id="start-btn">Get Started</button>
-                </div>
-            </form>
+            <p class="subtitle">Generate unique, plagiarism-free assignments instantly</p>
+        </header>
+        
+        <div id="welcome-section" class="card">
+            <div class="input-group">
+                <input type="text" id="user-name" placeholder="Enter your name">
+            </div>
+            <div class="select-wrapper">
+                <select id="subject-select">
+                    <option value="" disabled selected>Select Subject</option>
+                    <option value="english">English</option>
+                </select>
+            </div>
+            <button id="start-btn">Get Started</button>
         </div>
-
-        <div class="main-section hidden" id="main-section">
-            <header>
-                <h1>Assignment Generator</h1>
-                <div class="user-info">
-                    <span id="user-name-display">Welcome!</span>
-                </div>
-            </header>
-
-            <div class="assignment-options">
-                <h2>Select Assignments to Generate</h2>
+        
+        <div id="main-section" class="hidden">
+            <div class="card">
+                <h2 class="section-title">Select Assignments to Generate</h2>
                 <div class="option-grid">
                     <div class="option">
                         <input type="checkbox" id="assignment1" checked>
@@ -63,29 +734,46 @@
                 <button id="generate-btn" class="generate-button">
                     <i class="fas fa-magic"></i> Generate Assignments
                 </button>
-                <div class="loader hidden" id="loader">
+                <div id="loader" class="hidden">
                     <div class="spinner"></div>
-                    <p>Generating unique content...</p>
                 </div>
             </div>
-
-            <div class="results-section" id="results-section">
-                <!-- Results will be inserted here by JavaScript -->
+            
+            <div id="results-section">
+                <!-- Results will be displayed here -->
             </div>
         </div>
-
-        <footer class="footer">
-            Designed and developed by <a href="https://www.linkedin.com/in/srikar-t-118581286/" target="_blank">Srikar</a>
-        </footer>
+        
+        <div class="footer">
+            <p>Designed and developed by <a href="https://www.linkedin.com/in/srikar-t-118581286/" target="_blank">Srikar</a></p>
+        </div>
     </div>
-
-    <div class="toast-container" id="toast-container"></div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     
-    <script src="main.js"></script>
+    <div id="toast-container">
+        <!-- Toast notifications will appear here -->
+    </div>
+    
+    <!-- AI-generated badge -->
+    <div id="ai-badge" class="ai-badge hidden">
+        <i class="fas fa-robot"></i>
+        <span>AI-generated content, uniquely created for <strong id="user-badge-name">you</strong></span>
+        <button id="ai-badge-close" class="ai-badge-close"><i class="fas fa-times"></i></button>
+    </div>
+    
+    <!-- LinkedIn popup -->
+    <div id="linkedin-popup" class="linkedin-popup hidden">
+        <i class="fab fa-linkedin"></i>
+        <span>Click to connect with me on LinkedIn!</span>
+    </div>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
+    
+    <!-- Application Scripts -->
+    <script type="module" src="titles.js"></script>
+    <script type="module" src="titleQueue.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html> 
