@@ -90,6 +90,24 @@ const LINKEDIN_POPUP_INTERVAL = 15 * 60 * 1000; // Show again after 15 minutes
 // Global variable to track if we should show the LinkedIn popup
 let lastLinkedinPopupTime = parseInt(localStorage.getItem('lastLinkedinPopupTime') || '0');
 
+// Global variables
+let userInfo = {
+    name: '',
+    subject: '',
+    browser: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timestamp: formatTimestamp(),
+    generations: [],
+    linkedinClicks: 0
+};
+
+// New global variables for assignment notifications
+let lastGenerationTimestamp = Date.now();
+let recentGenerationsListener = null;
+
 // Helper function to format date in dd:MM:yyyy, hh:mm:ss (12-hour clock)
 function formatTimestamp(date = new Date()) {
     const day = String(date.getDate()).padStart(2, '0');
@@ -119,7 +137,7 @@ function getUserId() {
 // Show AI badge with the user's name
 function showAiBadge() {
     if (aiBadge && userBadgeName) {
-        userBadgeName.textContent = userName || 'you';
+        userBadgeName.textContent = userInfo.name || 'you';
         aiBadge.classList.remove('hidden');
         
         // Automatically hide badge after 5 seconds
@@ -138,7 +156,7 @@ function hideAiBadge() {
 
 // Show LinkedIn popup
 function showLinkedinPopup() {
-    if (linkedinPopup && userName) {
+    if (linkedinPopup && userInfo.name) {
         // Only show if enough time has passed since last showing
         const currentTime = Date.now();
         if (currentTime - lastLinkedinPopupTime > LINKEDIN_POPUP_INTERVAL) {
@@ -168,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (linkedinPopup) {
                 linkedinPopup.style.pointerEvents = 'auto';
                 // Show the popup when hovering if user has entered their name
-                if (userName) {
+                if (userInfo.name) {
                     showLinkedinPopup();
                 }
             }
@@ -201,22 +219,6 @@ document.addEventListener('DOMContentLoaded', function() {
 const assignment1Checkbox = document.getElementById('assignment1');
 const assignment2Checkbox = document.getElementById('assignment2');
 const assignment3Checkbox = document.getElementById('assignment3');
-
-// User Information
-let userName = '';
-let userSubject = '';
-let userInfo = {
-    name: '',
-    subject: '',
-    browser: navigator.userAgent,
-    platform: navigator.platform,
-    language: navigator.language,
-    screenResolution: `${window.screen.width}x${window.screen.height}`,
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    timestamp: formatTimestamp(),
-    generations: [],
-    linkedinClicks: 0
-};
 
 // Event Listeners
 if (startBtn) {
@@ -328,8 +330,6 @@ async function handleStart() {
         return;
     }
     
-    userName = name;
-    userSubject = subject;
     userInfo.name = name;
     userInfo.subject = subject;
     
@@ -337,7 +337,7 @@ async function handleStart() {
     userInfo.userId = getUserId();
     
     if (userNameDisplay) {
-        userNameDisplay.textContent = `Welcome, ${userName}! (${userSubject})`;
+        userNameDisplay.textContent = `Welcome, ${userInfo.name}! (${userInfo.subject})`;
     } else {
         console.warn("User name display element not found");
     }
@@ -354,6 +354,9 @@ async function handleStart() {
             welcomeSection.classList.add('hidden');
             mainSection.classList.remove('hidden');
             console.log("Main section should now be visible");
+            
+            // Initialize the recent generations display
+            updateRecentGenerationsDisplay();
             
             // Schedule the LinkedIn popup after a delay
             setTimeout(() => {
@@ -425,7 +428,7 @@ async function handleGenerate() {
         results.forEach(displayResult);
         
         // Show generation toast
-        showToast(`${userName || 'User'} just generated their assignments!`, 'success');
+        showToast(`${userInfo.name || 'User'} just generated their assignments!`, 'success');
         
         // Show the AI badge
         showAiBadge();
@@ -1054,9 +1057,55 @@ async function logGeneration(results) {
                 lastGenerationFormatted: formattedTimestamp,
                 totalGenerations: firebase.database.ServerValue.increment(results.length)
             });
+            
+            // Add to the recent_generations node for real-time notifications to all users
+            const recentGenRef = rtdb.ref(`recent_generations/gen_${Date.now()}`);
+            await recentGenRef.set({
+                userId: userInfo.userId,
+                userName: userInfo.name || 'Anonymous',
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                formattedTimestamp: formattedTimestamp,
+                assignmentTypes: results.map(r => r.type)
+            });
+            
+            // Cleanup old entries (keep only latest 20)
+            await cleanupRecentGenerations();
         }
     } catch (error) {
         // Error logging generation, continue
+    }
+}
+
+// Cleanup old generation notifications to prevent the list from growing too large
+async function cleanupRecentGenerations() {
+    try {
+        if (!rtdb) return;
+        
+        const recentGenRef = rtdb.ref('recent_generations');
+        const snapshot = await recentGenRef.orderByChild('timestamp').once('value');
+        
+        // Count the entries
+        let entries = [];
+        snapshot.forEach(childSnapshot => {
+            entries.push({
+                key: childSnapshot.key,
+                timestamp: childSnapshot.val().timestamp
+            });
+        });
+        
+        // If we have more than 20 entries, remove the oldest ones
+        if (entries.length > 20) {
+            // Sort by timestamp (oldest first)
+            entries.sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Delete oldest entries to keep only the latest 20
+            const entriesToDelete = entries.slice(0, entries.length - 20);
+            for (const entry of entriesToDelete) {
+                await rtdb.ref(`recent_generations/${entry.key}`).remove();
+            }
+        }
+    } catch (error) {
+        // Error cleaning up, continue
     }
 }
 
@@ -1142,60 +1191,294 @@ function collectUserInfo() {
 function init() {
     console.log("Application initializing");
     collectUserInfo();
-    console.log("User info collected:", userInfo);
+    
+    // Setup Firebase listeners for real-time notifications
+    setupRecentGenerationsListener();
+    
     console.log("Application initialization complete");
 }
 
-// Start the application
-console.log("Starting application");
-init();
+// Setup Firebase listener for recent generations from any user
+function setupRecentGenerationsListener() {
+    if (!rtdb) {
+        return; // Skip if Firebase is not available
+    }
+    
+    // Set initial timestamp to filter only new generations
+    lastGenerationTimestamp = Date.now();
+    
+    // Listen for new generations across all users
+    // We'll listen to a special 'recent_generations' node that will be updated on each generation
+    recentGenerationsListener = rtdb.ref('recent_generations').orderByChild('timestamp').startAt(lastGenerationTimestamp);
+    
+    recentGenerationsListener.on('child_added', (snapshot) => {
+        const generation = snapshot.val();
+        
+        // Ignore our own generations
+        if (generation.userId === getUserId()) {
+            return;
+        }
+        
+        // Update last timestamp
+        if (generation.timestamp > lastGenerationTimestamp) {
+            lastGenerationTimestamp = generation.timestamp;
+        }
+        
+        // Show notification for the new generation
+        showGenerationNotification(generation);
+    });
+}
 
-// Add CSS styles for the results
-(function addStyles() {
+// Show notification when another user generates assignments
+function showGenerationNotification(generation) {
+    const userName = generation.userName || 'Someone';
+    
+    // Show toast notification
+    showToast(`${userName} just generated their assignments!`, 'success');
+    
+    // Update recent generations display
+    updateRecentGenerationsDisplay(generation);
+}
+
+// Update the UI with recent generations
+// function updateRecentGenerationsDisplay(newGeneration = null) {
+//     // Find or create the recent generations container
+//     let recentGenerationsContainer = document.getElementById('recent-generations');
+//     if (!recentGenerationsContainer) {
+//         // Create the container if it doesn't exist
+//         const mainSection = document.getElementById('main-section');
+//         if (!mainSection) return;
+        
+//         recentGenerationsContainer = document.createElement('div');
+//         recentGenerationsContainer.id = 'recent-generations';
+//         recentGenerationsContainer.className = 'recent-generations-container';
+        
+//         // Create title
+//         // const title = document.createElement('h3');
+//         // title.className = 'recent-generations-title';
+//         // title.textContent = 'Recent Activity';
+//         // recentGenerationsContainer.appendChild(title);
+        
+//         // // Create list
+//         // const list = document.createElement('ul');
+//         // list.className = 'recent-generations-list';
+//         // list.id = 'recent-generations-list';
+//         // recentGenerationsContainer.appendChild(list);
+        
+//         // Add to main section (after the header)
+//         const firstCard = mainSection.querySelector('.card');
+//         if (firstCard) {
+//             mainSection.insertBefore(recentGenerationsContainer, firstCard);
+//         } else {
+//             mainSection.appendChild(recentGenerationsContainer);
+//         }
+        
+//         // Add styles for the recent generations
+//         addRecentGenerationsStyles();
+//     }
+    
+//     // If we have a new generation, add it to the list
+//     if (newGeneration) {
+//         const list = document.getElementById('recent-generations-list');
+//         if (!list) return;
+        
+//         const listItem = document.createElement('li');
+//         listItem.className = 'recent-generation-item';
+//         listItem.innerHTML = `
+//             <span class="activity-user">${newGeneration.userName || 'Someone'}</span>
+//             <span class="activity-action">generated assignments</span>
+//             <span class="activity-time">${formatTimeAgo(newGeneration.timestamp)}</span>
+//         `;
+        
+//         // Add animation
+//         listItem.style.animation = 'slideInRight 0.5s ease forwards';
+        
+//         // Add to the beginning of the list
+//         if (list.firstChild) {
+//             list.insertBefore(listItem, list.firstChild);
+//         } else {
+//             list.appendChild(listItem);
+//         }
+        
+//         // Limit to maximum 5 items
+//         while (list.children.length > 5) {
+//             list.removeChild(list.lastChild);
+//         }
+//     } else {
+//         // Initial load - fetch recent generations from Firebase
+//         loadRecentGenerations();
+//     }
+// }
+
+// Load recent generations from Firebase
+async function loadRecentGenerations() {
+    if (!rtdb) return;
+    
+    try {
+        const recentGenRef = rtdb.ref('recent_generations').orderByChild('timestamp').limitToLast(5);
+        const snapshot = await recentGenRef.once('value');
+        
+        // Get all items and sort by timestamp (newest first)
+        const items = [];
+        snapshot.forEach(childSnapshot => {
+            items.push(childSnapshot.val());
+        });
+        
+        // Sort by timestamp (newest first)
+        items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        
+        // Add each item to the display
+        const list = document.getElementById('recent-generations-list');
+        if (!list) return;
+        
+        // Clear the list
+        list.innerHTML = '';
+        
+        // Add items
+        items.forEach(item => {
+            const listItem = document.createElement('li');
+            listItem.className = 'recent-generation-item';
+            listItem.innerHTML = `
+                <span class="activity-user">${item.userName || 'Someone'}</span>
+                <span class="activity-action">generated assignments</span>
+                <span class="activity-time">${formatTimeAgo(item.timestamp)}</span>
+            `;
+            list.appendChild(listItem);
+        });
+        
+        // If no items, show a message
+        if (items.length === 0) {
+            const listItem = document.createElement('li');
+            listItem.className = 'recent-generation-item empty';
+            listItem.textContent = 'No recent activity';
+            list.appendChild(listItem);
+        }
+    } catch (error) {
+        console.error('Error loading recent generations:', error);
+    }
+}
+
+// Format timestamp as relative time (e.g., "2 minutes ago")
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return 'just now';
+    
+    // If it's a Firebase server timestamp object, it might not be resolved yet
+    if (typeof timestamp === 'object' && timestamp !== null) {
+        return 'just now';
+    }
+    
+    let time;
+    if (typeof timestamp === 'string') {
+        // Try to convert date string to timestamp
+        const date = new Date(timestamp);
+        if (isNaN(date)) {
+            return 'recently';
+        }
+        time = date.getTime();
+    } else {
+        time = timestamp;
+    }
+    
+    const now = Date.now();
+    const diff = now - time;
+    
+    // Time units in milliseconds
+    const minute = 60 * 1000;
+    const hour = minute * 60;
+    const day = hour * 24;
+    
+    if (diff < minute) {
+        return 'just now';
+    } else if (diff < hour) {
+        const minutes = Math.floor(diff / minute);
+        return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    } else if (diff < day) {
+        const hours = Math.floor(diff / hour);
+        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else {
+        const days = Math.floor(diff / day);
+        return `${days} day${days > 1 ? 's' : ''} ago`;
+    }
+}
+
+// Add CSS styles for the recent generations display
+function addRecentGenerationsStyles() {
     const style = document.createElement('style');
     style.textContent = `
-        .result-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-top: 1rem;
-            margin-bottom: 1.5rem;
-            color: var(--title-color, #2c3e50);
+        .recent-generations-container {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .recent-generations-title {
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+        
+        .recent-generations-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .recent-generation-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .recent-generation-item:last-child {
+            border-bottom: none;
+        }
+        
+        .recent-generation-item.empty {
+            color: var(--light-text);
+            font-style: italic;
             text-align: center;
-            letter-spacing: 0.5px;
-            border-bottom: 2px solid var(--title-border, #eaeaea);
-            padding-bottom: 0.75rem;
         }
         
-        .result-card-content {
-            line-height: 1.6;
-            text-align: justify;
-        }
-        
-        .result-card-content p {
-            margin-bottom: 1rem;
-        }
-        
-        .result-card-content strong {
+        .activity-user {
             font-weight: 600;
-            color: var(--strong-color, #333);
+            color: var(--primary-color);
+            margin-right: 5px;
         }
         
-        .result-card-content em {
-            font-style: italic;
-            color: var(--em-color, #555);
+        .activity-action {
+            color: var(--text-color);
+            margin-right: 5px;
         }
         
-        .word-count {
-            font-size: 0.85rem;
-            color: var(--word-count-color, #666);
-            text-align: right;
-            margin-top: 0.5rem;
-            margin-bottom: 0.5rem;
+        .activity-time {
+            color: var(--light-text);
+            margin-left: auto;
             font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .recent-generation-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .activity-time {
+                margin-left: 0;
+                margin-top: 3px;
+                font-size: 0.8rem;
+            }
         }
     `;
     document.head.appendChild(style);
-})();
+}
 
 // Theme Switcher Functionality
 document.addEventListener('DOMContentLoaded', function() {
@@ -1233,7 +1516,6 @@ function showFeedbackForm() {
     feedbackSection.innerHTML = `
         <div class="card">
             <h3 class="section-title">How was your experience?</h3>
-            <p>Please rate the quality of the generated assignments:</p>
             <div class="star-rating">
                 <span class="star" data-rating="1"><i class="far fa-star"></i></span>
                 <span class="star" data-rating="2"><i class="far fa-star"></i></span>
@@ -1317,7 +1599,7 @@ async function submitFeedback(rating, feedbackText) {
         // Create a feedback object
         const feedback = {
             userId: getUserId(),
-            userName: userName || 'Anonymous',
+            userName: userInfo.name || 'Anonymous',
             rating: rating,
             feedback: feedbackText || '',
             timestamp: firebase.database.ServerValue.TIMESTAMP,
@@ -1427,6 +1709,57 @@ async function submitFeedback(rating, feedbackText) {
         .submit-feedback-btn:not(:disabled):hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+// Start the application
+console.log("Starting application");
+init();
+
+// Add CSS styles for the results
+(function addStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            color: var(--title-color, #2c3e50);
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--title-border, #eaeaea);
+            padding-bottom: 0.75rem;
+        }
+        
+        .result-card-content {
+            line-height: 1.6;
+            text-align: justify;
+        }
+        
+        .result-card-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .result-card-content strong {
+            font-weight: 600;
+            color: var(--strong-color, #333);
+        }
+        
+        .result-card-content em {
+            font-style: italic;
+            color: var(--em-color, #555);
+        }
+        
+        .word-count {
+            font-size: 0.85rem;
+            color: var(--word-count-color, #666);
+            text-align: right;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-style: italic;
         }
     `;
     document.head.appendChild(style);
